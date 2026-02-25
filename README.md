@@ -561,6 +561,31 @@ nanobot gateway
 
 </details>
 
+## 🌐 Web Chat
+
+通过浏览器访问 nanobot，支持局域网访问和聊天记录持久化。
+
+**快速启动：**
+
+```bash
+# 安装 webchat 依赖
+pip install nanobot-ai[webchat]
+
+# 启动服务
+nanobot-webchat
+```
+
+然后访问 http://localhost:8081
+
+**功能特性：**
+- 💬 流式输出，实时显示回复
+- 📝 聊天记录自动保存，刷新不丢失
+- 📋 多会话管理（创建、切换、重命名、删除）
+- 🎨 现代深色主题，支持移动端
+- ⚙️ 自动读取 nanobot 配置
+
+详见 [nanobot/webchat/README.md](nanobot/webchat/README.md)
+
 ## 🌐 Agent Social Network
 
 🐈 nanobot is capable of linking to the agent social network (agent community). **Just send one message and your nanobot joins automatically!**

@@ -50,9 +50,15 @@ dev = [
     "pytest-asyncio>=1.3.0,<2.0.0",
     "ruff>=0.1.0",
 ]
+webchat = [
+    "flask>=2.3.0,<3.0.0",
+    "flask-cors>=4.0.0,<5.0.0",
+    "requests>=2.31.0,<3.0.0",
+]
 
 [project.scripts]
 nanobot = "nanobot.cli.commands:app"
+nanobot-webchat = "nanobot.webchat.app:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -71,6 +77,9 @@ include = [
     "nanobot/templates/**/*.md",
     "nanobot/skills/**/*.md",
     "nanobot/skills/**/*.sh",
+    "nanobot/webchat/templates/**/*.html",
+    "nanobot/webchat/static/**/*.css",
+    "nanobot/webchat/static/**/*.js",
 ]
 
 [tool.hatch.build.targets.sdist]
