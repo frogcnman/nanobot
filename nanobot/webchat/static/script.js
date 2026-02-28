@@ -9,8 +9,36 @@ class ChatApp {
         
         this.initializeElements();
         this.bindEvents();
-        this.loadConfig();
-        this.loadSessions();
+        this.checkAuth();
+    }
+    
+    async checkAuth() {
+        try {
+            const response = await fetch('/api/auth/status');
+            const data = await response.json();
+            
+            if (!data.authenticated) {
+                // Not authenticated, redirect to login
+                window.location.href = '/login';
+                return;
+            }
+            
+            // Authenticated, load app
+            this.loadConfig();
+            this.loadSessions();
+        } catch (error) {
+            console.error('Auth check failed:', error);
+            window.location.href = '/login';
+        }
+    }
+    
+    async logout() {
+        try {
+            await fetch('/logout', { method: 'POST' });
+            window.location.href = '/login';
+        } catch (error) {
+            console.error('Logout failed:', error);
+        }
     }
     
     initializeElements() {

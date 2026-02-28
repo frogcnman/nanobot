@@ -2,10 +2,10 @@
 """
 Web Chat System for nanobot
 A web-based chat interface accessible via LAN on port 8081
-With persistent chat history support
+With persistent chat history support and authentication
 """
 
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, make_response, redirect, url_for
 from flask_cors import CORS
 import requests
 import json
@@ -15,6 +15,14 @@ from datetime import datetime
 from pathlib import Path
 import threading
 import uuid
+import functools
+
+# Import auth module
+from .auth import (
+    is_auth_enabled, verify_user, create_session, validate_session,
+    destroy_session, add_user, list_users, remove_user, get_default_credentials,
+    cleanup_expired_sessions, hash_password, load_auth_config, save_auth_config
+)
 
 # Get the directory where this module is located
 MODULE_DIR = Path(__file__).parent
@@ -26,6 +34,9 @@ app = Flask(__name__,
             template_folder=str(MODULE_DIR / 'templates'),
             static_folder=str(MODULE_DIR / 'static'))
 CORS(app)
+
+# Secret key for sessions
+app.secret_key = os.urandom(32)
 
 # Data directory for persistent storage (use ~/.nanobot/webchat-data for persistence)
 DATA_DIR = Path.home() / ".nanobot" / "webchat-data"
@@ -141,6 +152,39 @@ MODEL = os.environ.get('MODEL', agent_defaults.get('model', DEFAULT_MODEL))
 
 SYSTEM_PROMPT = os.environ.get('SYSTEM_PROMPT', '你是 nanobot 🐈，一个友好、乐于助人的AI助手。请用简洁、准确的方式回答问题。')
 
+# ============ Authentication Decorator ============
+
+def login_required(f):
+    """Decorator to require authentication"""
+    @functools.wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not is_auth_enabled():
+            # Auth not enabled, allow access
+            return f(*args, **kwargs)
+        
+        session_token = request.cookies.get('webchat_session')
+        username = validate_session(session_token)
+        
+        if not username:
+            # Check for API token in header (for API access)
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith('Bearer '):
+                token = auth_header[7:]
+                username = validate_session(token)
+                if username:
+                    return f(*args, **kwargs)
+            
+            # Not authenticated, redirect to login or return 401
+            if request.headers.get('Accept') == 'application/json':
+                return jsonify({'error': '未认证，请先登录'}), 401
+            return redirect(url_for('login'))
+        
+        # Add username to request context
+        request.webchat_username = username
+        return f(*args, **kwargs)
+    
+    return decorated_function
+
 # ============ Persistence Functions ============
 
 def get_session_file(session_id):
@@ -251,14 +295,101 @@ def get_session_history(session_id):
     """Get or create conversation history for a session"""
     return load_session(session_id)
 
+# ============ Auth Routes ============
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login page or handle login"""
+    # Clean up expired sessions on each login page load
+    cleanup_expired_sessions()
+    
+    if request.method == 'POST':
+        data = request.json or {}
+        username = data.get('username', '').strip()
+        password = data.get('password', '')
+        
+        if not username or not password:
+            return jsonify({'error': '用户名和密码不能为空'}), 400
+        
+        if verify_user(username, password):
+            session_token = create_session(username)
+            response = make_response(jsonify({'success': True, 'message': '登录成功'}))
+            response.set_cookie('webchat_session', session_token, httponly=True, samesite='Lax',
+                              expires=datetime.now() + timedelta(hours=24))
+            return response
+        else:
+            return jsonify({'error': '用户名或密码错误'}), 401
+    
+    # GET request - show login page
+    return render_template('login.html', auth_enabled=is_auth_enabled())
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    """Logout"""
+    session_token = request.cookies.get('webchat_session')
+    if session_token:
+        destroy_session(session_token)
+    
+    response = make_response(jsonify({'success': True}))
+    response.set_cookie('webchat_session', '', expires=0)
+    return response
+
+@app.route('/api/auth/status', methods=['GET'])
+def auth_status():
+    """Get authentication status"""
+    session_token = request.cookies.get('webchat_session')
+    username = validate_session(session_token)
+    
+    return jsonify({
+        'authenticated': username is not None,
+        'username': username,
+        'auth_enabled': is_auth_enabled(),
+        'users': list_users() if username else []
+    })
+
+@app.route('/api/auth/register', methods=['POST'])
+@login_required
+def register_user():
+    """Register a new user (requires authentication)"""
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    
+    if not username or not password:
+        return jsonify({'error': '用户名和密码不能为空'}), 400
+    
+    if len(password) < 4:
+        return jsonify({'error': '密码长度至少4个字符'}), 400
+    
+    if add_user(username, password):
+        return jsonify({'success': True, 'message': f'用户 {username} 创建成功'})
+    else:
+        return jsonify({'error': '用户已存在'}), 400
+
+@app.route('/api/auth/users', methods=['GET'])
+@login_required
+def get_users():
+    """List all users"""
+    return jsonify({'users': list_users()})
+
+@app.route('/api/auth/users/<username>', methods=['DELETE'])
+@login_required
+def delete_user(username):
+    """Delete a user"""
+    if remove_user(username):
+        return jsonify({'success': True, 'message': f'用户 {username} 已删除'})
+    return jsonify({'error': '用户不存在'}), 404
+
 # ============ API Routes ============
 
 @app.route('/')
+@login_required
 def index():
     """Serve the main chat page"""
     return render_template('index.html')
 
 @app.route('/api/chat', methods=['POST'])
+@login_required
 def chat():
     """Handle chat messages"""
     data = request.json
@@ -336,12 +467,14 @@ def chat():
             return jsonify({'error': f'解析响应失败: {str(e)}'}), 500
 
 @app.route('/api/sessions', methods=['GET'])
+@login_required
 def api_list_sessions():
     """List all chat sessions"""
     sessions = list_sessions()
     return jsonify({'sessions': sessions})
 
 @app.route('/api/sessions', methods=['POST'])
+@login_required
 def api_create_session():
     """Create a new session"""
     session_id = f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
@@ -356,6 +489,7 @@ def api_create_session():
     })
 
 @app.route('/api/history', methods=['GET'])
+@login_required
 def get_history():
     """Get conversation history for a session"""
     session_id = request.args.get('session_id', 'default')
@@ -370,6 +504,7 @@ def get_history():
     })
 
 @app.route('/api/clear', methods=['POST'])
+@login_required
 def clear_history():
     """Clear conversation history for a session"""
     data = request.json or {}
@@ -382,6 +517,7 @@ def clear_history():
     return jsonify({'success': True, 'message': '对话历史已清除'})
 
 @app.route('/api/sessions/<session_id>', methods=['DELETE'])
+@login_required
 def api_delete_session(session_id):
     """Delete a session"""
     if delete_session(session_id):
@@ -389,6 +525,7 @@ def api_delete_session(session_id):
     return jsonify({'error': '会话不存在'}), 404
 
 @app.route('/api/sessions/<session_id>/rename', methods=['POST'])
+@login_required
 def api_rename_session(session_id):
     """Rename a session"""
     data = request.json or {}
@@ -460,11 +597,21 @@ def call_ai_api(messages, stream=False):
     except requests.exceptions.RequestException as e:
         return f"API 调用错误: {str(e)}"
 
+from datetime import timedelta
+
 def main():
     """Entry point for nanobot-webchat command"""
     # Ensure data directories exist
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Check if this is first time (no users configured)
+    if not is_auth_enabled():
+        print("\n" + "=" * 60)
+        print("⚠️  首次启动：认证功能已启用")
+        print("=" * 60)
+        print("访问 http://你的IP:8081/login 设置管理员账号")
+        print("=" * 60 + "\n")
     
     print("=" * 50)
     print("nanobot Web Chat System")
@@ -473,6 +620,7 @@ def main():
     print(f"Model: {MODEL}")
     print(f"API configured: {'Yes' if API_KEY else 'No'}")
     print(f"Data directory: {DATA_DIR}")
+    print(f"Authentication: {'Enabled' if is_auth_enabled() else 'Disabled'}")
     print(f"Access URL: http://0.0.0.0:8081")
     print("=" * 50)
     
