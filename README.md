@@ -583,6 +583,20 @@ nanobot-webchat
 - 📋 多会话管理（创建、切换、重命名、删除）
 - 🎨 现代深色主题，支持移动端
 - ⚙️ 自动读取 nanobot 配置
+- 🤖 Agent 模式支持（文件操作、命令执行等工具调用）
+
+**安装为系统服务（开机自启）：**
+
+```bash
+# 安装服务（需要 root 权限）
+sudo ./nanobot/webchat/install_service.sh install
+
+# 常用命令
+sudo systemctl status nanobot-webchat   # 查看状态
+sudo systemctl restart nanobot-webchat  # 重启服务
+journalctl -u nanobot-webchat -f        # 查看日志
+sudo ./install_service.sh uninstall     # 卸载服务
+```
 
 详见 [nanobot/webchat/README.md](nanobot/webchat/README.md)
 

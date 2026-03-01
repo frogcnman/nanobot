@@ -128,13 +128,15 @@ class ChatApp {
         const overlay = document.getElementById('sidebarOverlay');
         
         if (open) {
+            // 打开侧边栏
             this.sidebar.classList.add('open');
             this.sidebar.classList.remove('collapsed');
-            overlay.classList.add('active');
+            if (overlay) overlay.classList.add('active');
         } else {
+            // 关闭侧边栏
             this.sidebar.classList.remove('open');
             this.sidebar.classList.add('collapsed');
-            overlay.classList.remove('active');
+            if (overlay) overlay.classList.remove('active');
         }
     }
     
@@ -364,25 +366,16 @@ class ChatApp {
         const typingEl = this.addTypingIndicator();
         
         try {
-            // Create assistant message container
-            this.currentAssistantMessage = this.createMessageElement('assistant', '');
-            this.messagesContainer.appendChild(this.currentAssistantMessage);
-            
-            // Remove typing indicator
-            typingEl.remove();
-            
             // Send message with streaming
-            await this.streamMessage(message);
+            await this.streamMessage(message, typingEl);
             
             // Reload sessions to update title and time
             await this.loadSessions();
             
         } catch (error) {
-            typingEl.remove();
+            // 显示错误状态
+            this.showErrorIndicator(typingEl, error.message || '请求失败，请稍后重试');
             this.showStatus(`错误: ${error.message}`, 'error');
-            if (this.currentAssistantMessage) {
-                this.currentAssistantMessage.querySelector('.message-content').textContent = '抱歉，发生了错误。请稍后重试。';
-            }
         } finally {
             this.sendBtn.disabled = false;
             this.isStreaming = false;
@@ -390,8 +383,12 @@ class ChatApp {
         }
     }
     
-    async streamMessage(message) {
-        const response = await fetch('/api/chat', {
+    async streamMessage(message, typingEl) {
+        // Check if agent mode is enabled
+        const useAgent = document.getElementById('agentMode')?.checked;
+        const apiEndpoint = useAgent ? '/api/agent/chat' : '/api/chat';
+        
+        const response = await fetch(apiEndpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -399,7 +396,7 @@ class ChatApp {
             body: JSON.stringify({
                 message: message,
                 session_id: this.sessionId,
-                stream: true
+                stream: !useAgent  // Agent mode doesn't support streaming
             })
         });
         
@@ -407,9 +404,35 @@ class ChatApp {
             throw new Error(`HTTP ${response.status}`);
         }
         
+        // Agent mode: non-streaming response
+        if (useAgent) {
+            const data = await response.json();
+            
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            const content = data.response || data.content;
+            if (!content) {
+                throw new Error('未收到响应内容');
+            }
+            
+            // 移除思考状态样式，显示内容
+            const contentEl = typingEl.querySelector('.message-content');
+            if (contentEl) {
+                contentEl.classList.remove('thinking');
+                contentEl.innerHTML = this.formatContent(content);
+            }
+            this.scrollToBottom();
+            this.showStatus('在线', 'success');
+            return;
+        }
+        
+        // Normal mode: streaming response
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let fullContent = '';
+        let hasContent = false;
         
         while (true) {
             const { done, value } = await reader.read();
@@ -428,8 +451,19 @@ class ChatApp {
                     try {
                         const parsed = JSON.parse(data);
                         if (parsed.content) {
+                            // 第一次收到内容时，将思考指示器转换为消息
+                            if (!hasContent) {
+                                hasContent = true;
+                                // 移除思考状态样式
+                                const contentEl = typingEl.querySelector('.message-content');
+                                if (contentEl) {
+                                    contentEl.classList.remove('thinking');
+                                    contentEl.innerHTML = '';
+                                }
+                            }
+                            
                             fullContent += parsed.content;
-                            this.updateMessageContent(this.currentAssistantMessage, fullContent);
+                            this.updateMessageContent(typingEl, fullContent);
                             this.scrollToBottom();
                         } else if (parsed.error) {
                             throw new Error(parsed.error);
@@ -441,6 +475,11 @@ class ChatApp {
                     }
                 }
             }
+        }
+        
+        // 如果没有收到任何内容，显示错误
+        if (!hasContent) {
+            throw new Error('未收到响应内容');
         }
         
         this.showStatus('在线', 'success');
@@ -477,7 +516,33 @@ class ChatApp {
     }
     
     formatContent(content) {
-        // Simple markdown-like formatting
+        if (!content) return '';
+        
+        // Use marked.js for Markdown rendering
+        if (typeof marked !== 'undefined') {
+            try {
+                marked.setOptions({
+                    highlight: function(code, lang) {
+                        if (typeof hljs !== 'undefined') {
+                            if (lang && hljs.getLanguage(lang)) {
+                                try {
+                                    return hljs.highlight(code, { language: lang }).value;
+                                } catch (e) {}
+                            }
+                            return hljs.highlightAuto(code).value;
+                        }
+                        return code;
+                    },
+                    breaks: true,
+                    gfm: true
+                });
+                return marked.parse(content);
+            } catch (e) {
+                console.error('Markdown parse error:', e);
+            }
+        }
+        
+        // Fallback: simple markdown-like formatting
         let formatted = content
             // Escape HTML
             .replace(/&/g, '&amp;')
@@ -500,19 +565,51 @@ class ChatApp {
     addTypingIndicator() {
         const div = document.createElement('div');
         div.className = 'message assistant';
+        div.id = 'typingIndicator';
         div.innerHTML = `
             <div class="message-avatar">🐈</div>
-            <div class="message-content">
-                <div class="typing-indicator">
-                    <span></span>
-                    <span></span>
-                    <span></span>
+            <div class="message-content thinking">
+                <div class="thinking-status">
+                    <div class="thinking-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 6v6l4 2"/>
+                        </svg>
+                    </div>
+                    <span class="thinking-text">思考中</span>
+                    <div class="thinking-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
                 </div>
             </div>
         `;
         this.messagesContainer.appendChild(div);
         this.scrollToBottom();
         return div;
+    }
+    
+    showErrorIndicator(messageEl, errorMessage) {
+        // 将思考状态转换为错误状态
+        const contentEl = messageEl.querySelector('.message-content');
+        if (contentEl) {
+            contentEl.classList.remove('thinking');
+            contentEl.classList.add('error');
+            contentEl.innerHTML = `
+                <div class="error-status">
+                    <div class="error-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="15" y1="9" x2="9" y2="15"/>
+                            <line x1="9" y1="9" x2="15" y2="15"/>
+                        </svg>
+                    </div>
+                    <span class="error-text">${this.escapeHtml(errorMessage)}</span>
+                </div>
+            `;
+        }
+        this.scrollToBottom();
     }
     
     scrollToBottom() {

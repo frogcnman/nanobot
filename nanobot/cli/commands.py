@@ -1078,7 +1078,7 @@ def provider_login(
 @_register_login("openai_codex")
 def _login_openai_codex() -> None:
     try:
-        from oauth_cli_kit import get_token, login_oauth_interactive
+        from oauth_cli import get_token, login_oauth_interactive
         token = None
         try:
             token = get_token()

@@ -5,7 +5,7 @@ A web-based chat interface accessible via LAN on port 8081
 With persistent chat history support and authentication
 """
 
-from flask import Flask, render_template, request, jsonify, Response, make_response, redirect, url_for
+from flask import Flask, render_template, request, jsonify, Response, make_response, redirect, url_for, g
 from flask_cors import CORS
 import requests
 import json
@@ -18,10 +18,22 @@ import uuid
 import functools
 
 # Import auth module
+# Import auth module
 from .auth import (
     is_auth_enabled, verify_user, create_session, validate_session,
     destroy_session, add_user, list_users, remove_user, get_default_credentials,
     cleanup_expired_sessions, hash_password, load_auth_config, save_auth_config
+)
+
+# Import agent chat module
+from .agent_chat import agent_bp
+
+# Import security module
+from .security import (
+    audit_log, get_client_ip, rate_limit, ip_whitelist_required,
+    agent_mode_authorized, generate_api_token, validate_api_token,
+    revoke_api_token, list_api_tokens, set_ip_whitelist, load_security_config,
+    save_security_config,
 )
 
 # Get the directory where this module is located
@@ -34,6 +46,9 @@ app = Flask(__name__,
             template_folder=str(MODULE_DIR / 'templates'),
             static_folder=str(MODULE_DIR / 'static'))
 CORS(app)
+
+# Register agent chat blueprint
+app.register_blueprint(agent_bp)
 
 # Secret key for sessions
 app.secret_key = os.urandom(32)
@@ -49,6 +64,10 @@ file_lock = threading.Lock()
 
 # Provider configurations
 PROVIDER_CONFIGS = {
+    'minimax': {
+        'api_base': 'https://api.minimax.chat/v1',
+        'default_model': 'MiniMax-M2.5'
+    },
     'zhipu': {
         'api_base': 'https://open.bigmodel.cn/api/paas/v4',
         'default_model': 'glm-4-flash'
@@ -101,12 +120,37 @@ def load_nanobot_config():
     return {}
 
 def get_provider_config():
-    """Get the first available provider with API key"""
+    """Get provider config based on model name or first available provider with API key"""
     config = load_nanobot_config()
     providers = config.get('providers', {})
     
-    # Priority order for providers
-    priority = ['zhipu', 'openai', 'deepseek', 'anthropic', 'moonshot', 'groq', 'openrouter', 'siliconflow', 'custom']
+    # Get model from config to determine provider
+    agent_defaults = config.get('agents', {}).get('defaults', {})
+    model_name = agent_defaults.get('model', '')
+    
+    # If model has provider prefix (e.g., 'zhipu/glm-5'), use that provider
+    if model_name and '/' in model_name:
+        provider_from_model = model_name.split('/')[0]
+        if provider_from_model in providers:
+            provider_cfg = providers[provider_from_model]
+            api_key = provider_cfg.get('apiKey', '')
+            api_base = provider_cfg.get('apiBase')
+            
+            if api_key:
+                if not api_base and provider_from_model in PROVIDER_CONFIGS:
+                    api_base = PROVIDER_CONFIGS[provider_from_model]['api_base']
+                
+                default_model = PROVIDER_CONFIGS.get(provider_from_model, {}).get('default_model', 'default')
+                
+                return {
+                    'provider': provider_from_model,
+                    'api_key': api_key,
+                    'api_base': api_base,
+                    'default_model': default_model
+                }
+    
+    # Fallback: Priority order for providers
+    priority = ['zhipu', 'minimax', 'openai', 'deepseek', 'anthropic', 'moonshot', 'groq', 'openrouter', 'siliconflow', 'custom']
     
     for provider in priority:
         if provider in providers:
@@ -155,9 +199,16 @@ SYSTEM_PROMPT = os.environ.get('SYSTEM_PROMPT', '你是 nanobot 🐈，一个友
 # ============ Authentication Decorator ============
 
 def login_required(f):
-    """Decorator to require authentication"""
+    """Decorator to require authentication with security checks"""
     @functools.wraps(f)
     def decorated_function(*args, **kwargs):
+        # Check IP whitelist first
+        ip = get_client_ip()
+        from .security import is_ip_allowed
+        if not is_ip_allowed(ip):
+            audit_log('ip_blocked', level='WARNING', details={'ip': ip})
+            return jsonify({'error': '访问被拒绝'}), 403
+        
         if not is_auth_enabled():
             # Auth not enabled, allow access
             return f(*args, **kwargs)
@@ -170,8 +221,12 @@ def login_required(f):
             auth_header = request.headers.get('Authorization')
             if auth_header and auth_header.startswith('Bearer '):
                 token = auth_header[7:]
-                username = validate_session(token)
+                username = validate_api_token(token)
+                if not username:
+                    username = validate_session(token)
                 if username:
+                    request.webchat_username = username
+                    g.webchat_username = username
                     return f(*args, **kwargs)
             
             # Not authenticated, redirect to login or return 401
@@ -181,6 +236,7 @@ def login_required(f):
         
         # Add username to request context
         request.webchat_username = username
+        g.webchat_username = username
         return f(*args, **kwargs)
     
     return decorated_function
@@ -314,8 +370,11 @@ def login():
         if verify_user(username, password):
             session_token = create_session(username)
             response = make_response(jsonify({'success': True, 'message': '登录成功'}))
-            response.set_cookie('webchat_session', session_token, httponly=True, samesite='Lax',
-                              expires=datetime.now() + timedelta(hours=24))
+            response.set_cookie('webchat_session', session_token, 
+                              httponly=True, 
+                              samesite='Lax',
+                              path='/',
+                              max_age=24*60*60)  # 24 hours in seconds
             return response
         else:
             return jsonify({'error': '用户名或密码错误'}), 401
@@ -379,6 +438,129 @@ def delete_user(username):
     if remove_user(username):
         return jsonify({'success': True, 'message': f'用户 {username} 已删除'})
     return jsonify({'error': '用户不存在'}), 404
+
+
+# ============ Security API Routes ============
+
+@app.route('/api/security/tokens', methods=['GET'])
+@login_required
+def api_list_tokens():
+    """List API tokens for current user"""
+    username = getattr(request, 'webchat_username', 'anonymous')
+    tokens = list_api_tokens(username)
+    return jsonify({'tokens': tokens})
+
+
+@app.route('/api/security/tokens', methods=['POST'])
+@login_required
+def api_create_token():
+    """Create a new API token"""
+    username = getattr(request, 'webchat_username', 'anonymous')
+    data = request.json or {}
+    expires_days = data.get('expires_days', 30)
+    
+    token = generate_api_token(username, expires_days)
+    audit_log('api_token_created', username=username)
+    
+    return jsonify({
+        'token': token,
+        'message': 'API Token 已创建，请妥善保管，此令牌只显示一次'
+    })
+
+
+@app.route('/api/security/tokens/<path:token>', methods=['DELETE'])
+@login_required
+def api_revoke_token(token):
+    """Revoke an API token"""
+    username = getattr(request, 'webchat_username', 'anonymous')
+    
+    if revoke_api_token(token):
+        return jsonify({'success': True, 'message': 'Token 已撤销'})
+    return jsonify({'error': 'Token 不存在'}), 404
+
+
+@app.route('/api/security/whitelist', methods=['GET'])
+@login_required
+def api_get_whitelist():
+    """Get IP whitelist"""
+    config = load_security_config()
+    whitelist = config.get('ip_whitelist')
+    return jsonify({
+        'enabled': whitelist is not None,
+        'ips': whitelist or []
+    })
+
+
+@app.route('/api/security/whitelist', methods=['POST'])
+@login_required
+def api_set_whitelist():
+    """Set IP whitelist"""
+    data = request.json or {}
+    ips = data.get('ips')
+    enabled = data.get('enabled', True)
+    
+    if not enabled:
+        set_ip_whitelist(None)
+    else:
+        set_ip_whitelist(ips)
+    
+    audit_log('ip_whitelist_updated', username=getattr(request, 'webchat_username', 'anonymous'),
+              details={'ips': ips, 'enabled': enabled})
+    
+    return jsonify({'success': True, 'message': 'IP白名单已更新'})
+
+
+@app.route('/api/security/agent-users', methods=['GET'])
+@login_required
+def api_get_agent_users():
+    """Get users allowed to use agent mode"""
+    config = load_security_config()
+    users = config.get('agent_mode_users', [])
+    return jsonify({'users': users, 'all_users_allowed': len(users) == 0})
+
+
+@app.route('/api/security/agent-users', methods=['POST'])
+@login_required
+def api_set_agent_users():
+    """Set users allowed to use agent mode"""
+    data = request.json or {}
+    users = data.get('users', [])
+    
+    config = load_security_config()
+    config['agent_mode_users'] = users
+    save_security_config(config)
+    
+    audit_log('agent_users_updated', username=getattr(request, 'webchat_username', 'anonymous'),
+              details={'users': users})
+    
+    return jsonify({'success': True, 'message': 'Agent模式用户已更新'})
+
+
+@app.route('/api/security/audit-log', methods=['GET'])
+@login_required
+def api_get_audit_log():
+    """Get recent audit log entries"""
+    lines = request.args.get('lines', 100, type=int)
+    level = request.args.get('level')  # Filter by level if provided
+    
+    if not AUDIT_LOG_FILE.exists():
+        return jsonify({'entries': []})
+    
+    entries = []
+    with open(AUDIT_LOG_FILE, 'r', encoding='utf-8') as f:
+        for line in f:
+            try:
+                entry = json.loads(line.strip())
+                if level and entry.get('level') != level:
+                    continue
+                entries.append(entry)
+            except:
+                continue
+    
+    # Return last N entries
+    entries = entries[-lines:]
+    
+    return jsonify({'entries': entries})
 
 # ============ API Routes ============
 
@@ -568,7 +750,7 @@ def call_ai_api(messages, stream=False):
     clean_messages = [{"role": m["role"], "content": m["content"]} for m in messages]
     
     payload = {
-        "model": MODEL,
+        "model": MODEL.split('/')[-1],
         "messages": clean_messages,
         "stream": stream,
         "temperature": 0.7,
