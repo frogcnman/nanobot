@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "jobs": [
+    {
+      "id": "eaac4759",
+      "name": "每日日志分析任务 - 使用 miniMax M2.5 检测并",
+      "enabled": true,
+      "schedule": {
+        "kind": "cron",
+        "atMs": null,
+        "everyMs": null,
+        "expr": "0 0 * * *",
+        "tz": "Asia/Shanghai"
+      },
+      "payload": {
+        "kind": "agent_turn",
+        "message": "每日日志分析任务 - 使用 miniMax M2.5 检测并修复前一天日志中的错误",
+        "deliver": true,
+        "channel": "qq",
+        "to": "7BD233AED449A5C292FA5DC792A5ED83"
+      },
+      "state": {
+        "nextRunAtMs": 1775232000000,
+        "lastRunAtMs": 1775145600041,
+        "lastStatus": "ok",
+        "lastError": null,
+        "runHistory": [
+          {
+            "runAtMs": 1774713600002,
+            "status": "ok",
+            "durationMs": 139892,
+            "error": null
+          },
+          {
+            "runAtMs": 1774886400033,
+            "status": "ok",
+            "durationMs": 106391,
+            "error": null
+          },
+          {
+            "runAtMs": 1775059200003,
+            "status": "ok",
+            "durationMs": 149100,
+            "error": null
+          },
+          {
+            "runAtMs": 1775145600041,
+            "status": "ok",
+            "durationMs": 28977,
+            "error": null
+          }
+        ]
+      },
+      "createdAtMs": 1772377689595,
+      "updatedAtMs": 1775145629018,
+      "deleteAfterRun": false
+    },
+    {
+      "id": "a29607a1",
+      "name": "科技简报",
+      "enabled": true,
+      "schedule": {
+        "kind": "cron",
+        "atMs": null,
+        "everyMs": null,
+        "expr": "0 9 * * *",
+        "tz": null
+      },
+      "payload": {
+        "kind": "agent_turn",
+        "message": "获取科技新闻和GitHub热榜，WEBCHAT自动汇报",
+        "deliver": true,
+        "channel": "qq",
+        "to": "7BD233AED449A5C292FA5DC792A5ED83"
+      },
+      "state": {
+        "nextRunAtMs": 1775178000000,
+        "lastRunAtMs": 1775091600002,
+        "lastStatus": "ok",
+        "lastError": null,
+        "runHistory": [
+          {
+            "runAtMs": 1774832400002,
+            "status": "ok",
+            "durationMs": 55702,
+            "error": null
+          },
+          {
+            "runAtMs": 1774918800002,
+            "status": "ok",
+            "durationMs": 55192,
+            "error": null
+          },
+          {
+            "runAtMs": 1775091600002,
+            "status": "ok",
+            "durationMs": 56761,
+            "error": null
+          }
+        ]
+      },
+      "createdAtMs": 1773466252331,
+      "updatedAtMs": 1775091656763,
+      "deleteAfterRun": false
+    },
+    {
+      "id": "595f1af5",
+      "name": "系统自动更新",
+      "enabled": true,
+      "schedule": {
+        "kind": "cron",
+        "atMs": null,
+        "everyMs": null,
+        "expr": "0 3 * * *",
+        "tz": null
+      },
+      "payload": {
+        "kind": "agent_turn",
+        "message": "执行自动更新检查和系统维护",
+        "deliver": true,
+        "channel": "qq",
+        "to": "7BD233AED449A5C292FA5DC792A5ED83"
+      },
+      "state": {
+        "nextRunAtMs": 1775156400000,
+        "lastRunAtMs": 1775070000001,
+        "lastStatus": "ok",
+        "lastError": null,
+        "runHistory": [
+          {
+            "runAtMs": 1774724400002,
+            "status": "ok",
+            "durationMs": 67784,
+            "error": null
+          },
+          {
+            "runAtMs": 1774897200001,
+            "status": "ok",
+            "durationMs": 84969,
+            "error": null
+          },
+          {
+            "runAtMs": 1775070000001,
+            "status": "ok",
+            "durationMs": 50728,
+            "error": null
+          }
+        ]
+      },
+      "createdAtMs": 1773466252992,
+      "updatedAtMs": 1775070050729,
+      "deleteAfterRun": false
+    }
+  ]
+}
