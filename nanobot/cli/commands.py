@@ -1269,7 +1269,7 @@ def provider_login(
 @_register_login("openai_codex")
 def _login_openai_codex() -> None:
     try:
-        from oauth_cli_kit import get_token, login_oauth_interactive
+        from oauth_cli import get_token, login_oauth_interactive
         token = None
         try:
             token = get_token()
@@ -1286,7 +1286,7 @@ def _login_openai_codex() -> None:
             raise typer.Exit(1)
         console.print(f"[green]✓ Authenticated with OpenAI Codex[/green]  [dim]{token.account_id}[/dim]")
     except ImportError:
-        console.print("[red]oauth_cli_kit not installed. Run: pip install oauth-cli-kit[/red]")
+        console.print("[red]oauth-cli not installed. Run: pip install oauth-cli[/red]")
         raise typer.Exit(1)
 
 

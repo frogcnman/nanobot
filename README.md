@@ -741,95 +741,134 @@ nanobot gateway
 
 </details>
 
-<details>
-<summary><b>WeChat (微信 / Weixin)</b></summary>
+## 🌐 Web Chat
 
-Uses **HTTP long-poll** with QR-code login via the ilinkai personal WeChat API. No local WeChat desktop client is required.
+ 通过浏览器访问 nanobot，支持局域网访问和聊天记录持久化。
 
-**1. Install with WeChat support**
+ **快速启动：**
 
-```bash
-pip install "nanobot-ai[weixin]"
-```
+ ```bash
+ # 安装 webchat 依赖
+ pip install nanobot-ai[webchat]
 
-**2. Configure**
+ # 启动服务
+ nanobot-webchat
+ ```
 
-```json
-{
-  "channels": {
-    "weixin": {
-      "enabled": true,
-      "allowFrom": ["YOUR_WECHAT_USER_ID"]
-    }
-  }
-}
-```
+ 然后访问 http://localhost:8081
 
-> - `allowFrom`: Add the sender ID you see in nanobot logs for your WeChat account. Use `["*"]` to allow all users.
-> - `token`: Optional. If omitted, log in interactively and nanobot will save the token for you.
-> - `routeTag`: Optional. When your upstream Weixin deployment requires request routing, nanobot will send it as the `SKRouteTag` header.
-> - `stateDir`: Optional. Defaults to nanobot's runtime directory for Weixin state.
-> - `pollTimeout`: Optional long-poll timeout in seconds.
+ **功能特性：**
+ - 💬 流式输出，实时显示回复
+ - 📝 聊天记录自动保存，刷新不丢失
+ - 📋 多会话管理（创建、切换、重命名、删除）
+ - 🎨 现代深色主题，支持移动端
+ - ⚙️ 自动读取 nanobot 配置
+ - 🤖 Agent 模式支持（文件操作、命令执行等工具调用）
 
-**3. Login**
+ **安装为系统服务（开机自启）：**
 
-```bash
-nanobot channels login weixin
-```
+ ```bash
+ # 安装服务（需要 root 权限）
+ sudo ./nanobot/webchat/install_service.sh install
 
-Use `--force` to re-authenticate and ignore any saved token:
+ # 常用命令
+ sudo systemctl status nanobot-webchat   # 查看状态
+ sudo systemctl restart nanobot-webchat  # 重启服务
+ journalctl -u nanobot-webchat -f        # 查看日志
+ sudo ./install_service.sh uninstall     # 卸载服务
+ ```
 
-```bash
-nanobot channels login weixin --force
-```
+ 详见 [nanobot/webchat/README.md](nanobot/webchat/README.md)
 
-**4. Run**
+ <details>
+ <summary><b>WeChat (微信 / Weixin)</b></summary>
 
-```bash
-nanobot gateway
-```
+ Uses **HTTP long-poll** with QR-code login via the ilinkai personal WeChat API. No local WeChat desktop client is required.
 
-</details>
+ **1. Install with WeChat support**
 
-<details>
-<summary><b>Wecom (企业微信)</b></summary>
+ ```bash
+ pip install "nanobot-ai[weixin]"
+ ```
 
-> Here we use [wecom-aibot-sdk-python](https://github.com/chengyongru/wecom_aibot_sdk) (community Python version of the official [@wecom/aibot-node-sdk](https://www.npmjs.com/package/@wecom/aibot-node-sdk)).
->
-> Uses **WebSocket** long connection — no public IP required.
+ **2. Configure**
 
-**1. Install the optional dependency**
+ ```json
+ {
+   "channels": {
+     "weixin": {
+       "enabled": true,
+       "allowFrom": ["YOUR_WECHAT_USER_ID"]
+     }
+   }
+ }
+ ```
 
-```bash
-pip install nanobot-ai[wecom]
-```
+ > - `allowFrom`: Add the sender ID you see in nanobot logs for your WeChat account. Use `["*"]` to allow all users.
+ > - `token`: Optional. If omitted, log in interactively and nanobot will save the token for you.
+ > - `routeTag`: Optional. When your upstream Weixin deployment requires request routing, nanobot will send it as the `SKRouteTag` header.
+ > - `stateDir`: Optional. Defaults to nanobot's runtime directory for Weixin state.
+ > - `pollTimeout`: Optional long-poll timeout in seconds.
 
-**2. Create a WeCom AI Bot**
+ **3. Login**
 
-Go to the WeCom admin console → Intelligent Robot → Create Robot → select **API mode** with **long connection**. Copy the Bot ID and Secret.
+ ```bash
+ nanobot channels login weixin
+ ```
 
-**3. Configure**
+ Use `--force` to re-authenticate and ignore any saved token:
 
-```json
-{
-  "channels": {
-    "wecom": {
-      "enabled": true,
-      "botId": "your_bot_id",
-      "secret": "your_bot_secret",
-      "allowFrom": ["your_id"]
-    }
-  }
-}
-```
+ ```bash
+ nanobot channels login weixin --force
+ ```
 
-**4. Run**
+ **4. Run**
 
-```bash
-nanobot gateway
-```
+ ```bash
+ nanobot gateway
+ ```
 
-</details>
+ </details>
+
+ <details>
+ <summary><b>Wecom (企业微信)</b></summary>
+
+ > Here we use [wecom-aibot-sdk-python](https://github.com/chengyongru/wecom_aibot_sdk) (community Python version of the official [@wecom/aibot-node-sdk](https://www.npmjs.com/package/@wecom/aibot-node-sdk)).
+ >
+ > Uses **WebSocket** long connection — no public IP required.
+
+ **1. Install the optional dependency**
+
+ ```bash
+ pip install nanobot-ai[wecom]
+ ```
+
+ **2. Create a WeCom AI Bot**
+
+ Go to the WeCom admin console → Intelligent Robot → Create Robot → select **API mode** with **long connection**. Copy the Bot ID and Secret.
+
+ **3. Configure**
+
+ ```json
+ {
+   "channels": {
+     "wecom": {
+       "enabled": true,
+       "botId": "your_bot_id",
+       "secret": "your_bot_secret",
+       "allowFrom": ["your_id"]
+     }
+   }
+ }
+ ```
+
+ **4. Run**
+
+ ```bash
+ nanobot gateway
+ ```
+
+ </details>
 
 ## 🌐 Agent Social Network
 
