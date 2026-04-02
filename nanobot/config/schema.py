@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 from pydantic_settings import BaseSettings
 
+from nanobot.config.feature_gate import FeatureGateConfig
+
 
 class Base(BaseModel):
     """Base model that accepts both camelCase and snake_case keys."""
@@ -28,6 +30,30 @@ class ChannelsConfig(Base):
     send_max_retries: int = Field(default=3, ge=0, le=10)  # Max delivery attempts (initial send included)
 
 
+class TokenBudgetConfig(Base):
+    """Token budget configuration per task type.
+
+    Inspired by Claude Code task-budgets: different tasks need different token caps
+    - simple_chat: small budget for quick answers → cheaper and faster
+    - planning: large budget for complex reasoning → better quality
+    - default: fallback budget when not specified
+    """
+
+    default: int = 8192
+    simple_chat: int = 2048
+    planning: int = 16384
+    code_review: int = 8192
+    document_analysis: int = 12288
+    subagent: int = 12288
+
+
+class FeatureGatesConfig(Base):
+    """Feature gates configuration."""
+
+    gates: dict[str, bool] = Field(default_factory=dict)
+    """Feature gate name -> enabled."""
+
+
 class AgentDefaults(Base):
     """Default agent configuration."""
 
@@ -42,6 +68,11 @@ class AgentDefaults(Base):
     max_tool_iterations: int = 40
     reasoning_effort: str | None = None  # low / medium / high - enables LLM thinking mode
     timezone: str = "UTC"  # IANA timezone, e.g. "Asia/Shanghai", "America/New_York"
+    token_budgets: TokenBudgetConfig = Field(default_factory=TokenBudgetConfig)
+    """Per-task token budget configuration."""
+
+    feature_gates: FeatureGatesConfig = Field(default_factory=FeatureGatesConfig)
+    """Feature gates (toggles) for gradual rollout."""
 
 
 class AgentsConfig(Base):
@@ -149,6 +180,19 @@ class MCPServerConfig(Base):
     tool_timeout: int = 30  # seconds before a tool call is cancelled
     enabled_tools: list[str] = Field(default_factory=lambda: ["*"])  # Only register these tools; accepts raw MCP names or wrapped mcp_<server>_<tool> names; ["*"] = all tools; [] = no tools
 
+class SecurityConfig(Base):
+    """Security configuration."""
+
+    enable_prompt_injection_detection: bool = True
+    """Enable two-stage prompt injection detection."""
+
+    denial_threshold_consecutive: int = Field(default=3, ge=1, le=10)
+    """Trigger fallback after this many consecutive suspicious detections."""
+
+    denial_threshold_total: int = Field(default=20, ge=5, le=100)
+    """Trigger fallback after this many total suspicious detections in session."""
+
+
 class ToolsConfig(Base):
     """Tools configuration."""
 
@@ -167,6 +211,8 @@ class Config(BaseSettings):
     api: ApiConfig = Field(default_factory=ApiConfig)
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
+    security: "SecurityConfig" = Field(default_factory="SecurityConfig")
+    """Security configuration (prompt injection detection, etc)."""
 
     @property
     def workspace_path(self) -> Path:

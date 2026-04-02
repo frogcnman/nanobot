@@ -28,6 +28,8 @@ class AgentRunSpec:
     max_iterations: int
     temperature: float | None = None
     max_tokens: int | None = None
+    max_tokens_task_type: str | None = None
+    """Task type for token budget lookup (defaults to 'default')."""
     reasoning_effort: str | None = None
     hook: AgentHook | None = None
     error_message: str | None = _DEFAULT_ERROR_MESSAGE
