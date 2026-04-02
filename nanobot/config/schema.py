@@ -180,6 +180,59 @@ class MCPServerConfig(Base):
     tool_timeout: int = 30  # seconds before a tool call is cancelled
     enabled_tools: list[str] = Field(default_factory=lambda: ["*"])  # Only register these tools; accepts raw MCP names or wrapped mcp_<server>_<tool> names; ["*"] = all tools; [] = no tools
 
+class MemoryConfig(Base):
+    """Two-layer memory system configuration (inspired by Claude Code).
+    
+    Session Memory: automatic compression for long sessions
+    Auto Memory: automatic background consolidation of long-term memory
+    """
+
+    # Session compression (P0)
+    enable_session_compression: bool = True
+    """Enable automatic session compression when token limit is reached."""
+
+    compression_threshold_tokens: int = Field(default=5000, ge=1000, le=100000)
+    """Compress when token count exceeds this threshold."""
+
+    compression_threshold_tool_calls: int = Field(default=3, ge=1, le=20)
+    """Compress after this many tool calls."""
+
+    # Auto Memory consolidation (P1)
+    enable_auto_memory: bool = True
+    """Enable automatic long-term memory consolidation."""
+
+    min_hours_since_last_consolidation: int = Field(default=24, ge=1, le=168)
+    """Minimum hours since last consolidation before triggering again."""
+
+    min_new_sessions_before_consolidation: int = Field(default=5, ge=1, le=50)
+    """Minimum number of new sessions accumulated before triggering consolidation."""
+
+    # Background consolidation (P2)
+    enable_background_consolidation: bool = True
+    """Run consolidation in background to avoid blocking user interaction."""
+
+    # Memory search (P2)
+    enable_memory_search: bool = True
+    """Enable search relevant long-term memory and inject into context."""
+
+    max_memory_search_results: int = Field(default=5, ge=1, le=20)
+    """Maximum number of memory results to inject into context."""
+
+    # Git versioning (P3)
+    enable_git_versioning: bool = True
+    """Enable git versioning for memory files."""
+
+    # Pruning (P3)
+    enable_pruning: bool = True
+    """Enable automatic pruning of stale/outdated memory."""
+
+    prune_after_days: int = Field(default=365, ge=30, le=1825)
+    """Prune entries older than this many days."""
+
+    min_entries_to_keep_per_topic: int = Field(default=10, ge=5, le=100)
+    """Minimum number of entries to keep per topic even if stale."""
+
+
 class SecurityConfig(Base):
     """Security configuration."""
 
@@ -213,6 +266,8 @@ class Config(BaseSettings):
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
     security: "SecurityConfig" = Field(default_factory="SecurityConfig")
     """Security configuration (prompt injection detection, etc)."""
+    memory: "MemoryConfig" = Field(default_factory="MemoryConfig")
+    """Two-layer memory system configuration (session compression + auto memory)."""
 
     @property
     def workspace_path(self) -> Path:

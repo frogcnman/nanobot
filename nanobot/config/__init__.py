@@ -19,6 +19,7 @@ from nanobot.config.schema import (
     FeatureGatesConfig,
     TokenBudgetConfig,
     SecurityConfig,
+    MemoryConfig,
 )
 
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     "FeatureGatesConfig",
     "TokenBudgetConfig",
     "SecurityConfig",
+    "MemoryConfig",
     "load_config",
     "get_config_path",
     "get_data_dir",
