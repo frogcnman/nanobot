@@ -248,3 +248,96 @@
 - 符合包月套餐成本结构，可持续盈利
 - 首页合法合规，营销冲击力强，界面美观引导清晰
 - 容器`75a0c0757922`正常运行，访问地址：http://43.155.246.81
+
+## 2026-04-05 TokenPort 首页HTML重构与About页面设计
+### 首页渲染问题迭代修复
+- 问题根源：OneAPI首页不支持嵌套块级HTML，混合Markdown+HTML导致渲染失败
+- v4方案：改用纯Markdown+行内样式，去掉外层`<div>`，保留营销效果，修复后仍不满足用户需求
+- 最终方案：用户要求改为**完整独立HTML格式**，从头编写带内嵌CSS的完整HTML文档
+- 用户要求：保持整体**白色背景**，内容区块采用科技感、年轻化配色
+
+### 最终首页设计特点
+- ✅ 整体纯白背景`#ffffff`，匹配OneAPI系统风格
+- ✅ 蓝紫渐变头部和横幅，浅蓝/浅灰渐变卡片，科技感年轻化
+- ✅ 卡片悬浮上浮交互，更大圆角(16px-20px)，自然阴影层次
+- ✅ 绿色渐变折扣徽章`[-20%]`，蓝色表头，绿色价格突出
+- ✅ 响应式设计，手机端自动适配
+- ✅ 核心营销信息：大标题`TokenPort | Chinese AI Models. 20% Cheaper Everywhere.`，三卖点`💰 20% Cheaper | 🌍 Global Access | 🔌 OpenAI Compatible`，蓝色渐变CTA横幅`🎁 700 FREE CREDITS`，四步引导清晰
+- 更新数据库后重启容器`75a0c0757922`生效，可正常渲染
+
+### About页面HTML设计
+- 用户要求提供英文简介，使用HTML格式，风格匹配首页
+- 设计：浅蓝色渐变背景，蓝色边框，圆角阴影，排版舒展
+- 内容：
+```
+🚀 About TokenPort
+TokenPort is your gateway to affordable AI tokens. We provide global users with stable, low-cost access 
+to cutting-edge Chinese large language models — all fully OpenAI-compatible.
+Our mission is simple: make premium AI affordable everywhere. Every model we offer is at least 20% cheaper 
+than major platforms. Same quality. Same models. Just lower prices.
+Powered by Chengdu Haizhiwei Technology Co., Ltd.
+```
+- 更新到OneAPI About配置，重启容器生效，风格与首页完全统一
+
+## 2026-04-06 TokenPort 域名购买咨询
+### 基础信息确认
+- 用户确认TokenPort当前运行宿主机IP地址：`43.155.246.81`
+- 用户计划购买`TokenPort.ai`域名，咨询可靠购买渠道
+
+### 主流.ai域名注册商对比（2026年3月涨价后）
+.ai域名已于2026年3月5日全面涨价14%，当前最新价格：
+
+| 注册商 | 注册价格/年 | 续费价格/年 | 优势 | 支付方式 |
+|--------|------------|------------|------|----------|
+| **NameSilo** | $74.99 | $74.99 | 价格最便宜，续费同价，无套路 | ✅ 支付宝 |
+| **Dynadot** | $74.90 | $74.90 | 价格低，常有优惠 | ✅ 支付宝 |
+| **Namecheap** | $79.98 | $92.98 | 品牌大，用户体验好 | 💳 信用卡/PayPal |
+| **Gname** | $80.99(8折后) | $100.00 | 新加坡商家，中文界面 | ✅ 支付宝 |
+| **Cloudflare Registrar** | ~$70-80 | ~$70-80 | 零加价成本价，免费隐私保护和安全功能，Cloudflare生态集成 | 💳 信用卡/PayPal |
+
+- 推荐优先级（国内用户）：NameSilo / Dynadot（价格低+支持支付宝）> Cloudflare（有信用卡首选，价格透明）> Gname（中文界面偏好可选）
+
+### Cloudflare Registrar购买流程
+1. 注册/登录Cloudflare账号
+2. 在https://domains.cloudflare.com/搜索目标域名
+3. 可注册则加入购物车，默认启用Cloudflare DNS
+4. 信用卡/PayPal付款，等待注册生效
+5. 添加A记录解析指向`43.155.246.81`即可使用
+
+- 优点：零加价无隐藏消费，免费隐私保护/DNSSEC/域名锁，和Cloudflare CDN/DNS天然集成
+- 缺点：不支持支付宝
+
+## 2026-04-06 TokenPort 域名绑定、HTTPS证书与首页完善
+### 域名申请与Nginx反向代理配置
+- 用户申请了域名 `tokenport.top`，要求配置解析到服务器 `43.155.246.81`
+- 重新创建Docker容器，改为绑定 `127.0.0.1:3000`（不再直接占用80端口），新容器ID: `e375a99eb7c4`
+- 安装Nginx，配置反向代理 `tokenport.top` → `127.0.0.1:3000`
+- 初始配置proxy_pass写错（写了80端口），用户反馈后立即修正为3000端口
+
+### SSL证书配置
+- 安装certbot，通过Let's Encrypt自动申请免费SSL证书
+- 成功配置HTTPS，证书自动续期已启用
+- 最终访问地址：**https://tokenport.top**
+
+### 充值与兑换码机制说明
+- 用户询问PayPal收款$9.9为用户充值$12的操作方式
+- OneAPI支持两种方式：兑换码（redemptions表）和直接修改用户余额（users表）
+- 顶部充值链接功能位于运营设置
+
+### 首页自动英文与API使用指南
+- 在Nginx配置中注入JavaScript，强制OneAPI默认语言为英文（`localStorage.setItem('lang','en')`）
+- 在首页Quick Start部分增加API使用说明：API Key获取、OpenAI兼容端点地址、配置示例代码块
+- 所有更新通过Python参数化查询写入数据库，避免SQL转义问题
+
+### 当前系统状态
+| 项目 | 值 |
+|--------|-----|
+| 容器ID | `e375a99eb7c4` |
+| 容器名称 | `one-api` |
+| 端口绑定 | `127.0.0.1:3000->3000/tcp` |
+| 反向代理 | Nginx → 127.0.0.1:3000 |
+| 数据目录 | `/home/ubuntu/data/one-api` |
+| 域名 | `tokenport.top` |
+| HTTPS | Let's Encrypt (certbot自动续期) |
+| Logo | https://gitee.com/frogcn/logo/raw/master/tokenport-logo-128.png |
+| 推广兑换码 | `LAUNCH100`(100), `HN200`(200), `REDDIT150`(150), `WELCOME300`(300) |
