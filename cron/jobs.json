@@ -20,17 +20,11 @@
         "to": "7BD233AED449A5C292FA5DC792A5ED83"
       },
       "state": {
-        "nextRunAtMs": 1777651200000,
-        "lastRunAtMs": 1777564800022,
+        "nextRunAtMs": 1777737600000,
+        "lastRunAtMs": 1777651200028,
         "lastStatus": "ok",
         "lastError": null,
         "runHistory": [
-          {
-            "runAtMs": 1775836800030,
-            "status": "ok",
-            "durationMs": 35061,
-            "error": null
-          },
           {
             "runAtMs": 1775923200039,
             "status": "ok",
@@ -144,11 +138,17 @@
             "status": "ok",
             "durationMs": 33602,
             "error": null
+          },
+          {
+            "runAtMs": 1777651200028,
+            "status": "ok",
+            "durationMs": 42677,
+            "error": null
           }
         ]
       },
       "createdAtMs": 1772377689595,
-      "updatedAtMs": 1777564833624,
+      "updatedAtMs": 1777651242705,
       "deleteAfterRun": false
     },
     {
@@ -170,17 +170,11 @@
         "to": "7BD233AED449A5C292FA5DC792A5ED83"
       },
       "state": {
-        "nextRunAtMs": 1777597200000,
-        "lastRunAtMs": 1777510800002,
+        "nextRunAtMs": 1777683600000,
+        "lastRunAtMs": 1777597200001,
         "lastStatus": "ok",
         "lastError": null,
         "runHistory": [
-          {
-            "runAtMs": 1775869200001,
-            "status": "ok",
-            "durationMs": 198838,
-            "error": null
-          },
           {
             "runAtMs": 1775955600001,
             "status": "ok",
@@ -294,11 +288,17 @@
             "status": "ok",
             "durationMs": 138024,
             "error": null
+          },
+          {
+            "runAtMs": 1777597200001,
+            "status": "ok",
+            "durationMs": 49259,
+            "error": null
           }
         ]
       },
       "createdAtMs": 1773466252331,
-      "updatedAtMs": 1777510938026,
+      "updatedAtMs": 1777597249260,
       "deleteAfterRun": false
     },
     {
@@ -320,17 +320,11 @@
         "to": "7BD233AED449A5C292FA5DC792A5ED83"
       },
       "state": {
-        "nextRunAtMs": 1777575600000,
-        "lastRunAtMs": 1777489200020,
+        "nextRunAtMs": 1777662000000,
+        "lastRunAtMs": 1777575600021,
         "lastStatus": "ok",
         "lastError": null,
         "runHistory": [
-          {
-            "runAtMs": 1775761200028,
-            "status": "ok",
-            "durationMs": 72789,
-            "error": null
-          },
           {
             "runAtMs": 1775847600032,
             "status": "ok",
@@ -444,11 +438,17 @@
             "status": "ok",
             "durationMs": 44251,
             "error": null
+          },
+          {
+            "runAtMs": 1777575600021,
+            "status": "ok",
+            "durationMs": 32594,
+            "error": null
           }
         ]
       },
       "createdAtMs": 1773466252992,
-      "updatedAtMs": 1777489244271,
+      "updatedAtMs": 1777575632615,
       "deleteAfterRun": false
     }
   ]
